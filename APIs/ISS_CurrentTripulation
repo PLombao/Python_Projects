@@ -1,0 +1,35 @@
+# Importamos la librería json.
+import json
+        
+# Importamos la librería requests para APIs.
+import requests
+
+"""
+This API get the current tripulation of the ISS
+"""
+
+def get_spaceppl():
+    """
+    Función que devuelve un entero con el número de personas
+    en la estación espacial actualmente, no toma ningún parámetro.
+    Si ocurre un error (cod != 200), devuelve error + coderror
+    """
+
+    # Realizamos petición get a la API para conseguir el num de personas en el espacio
+    response = requests.get('http://api.open-notify.org/astros.json')
+    
+    # pasamos el cuerpo del json a un diccionario
+    api_dict = json.loads(response.content)
+    
+    # flujo de control por error
+    if response.status_code == 200:
+        
+        # si la conexión es satisfactoria devolver # personas en la ISS
+        return api_dict['number']
+    else:
+        # sino devolvemos código de error
+        print "Ha ocurrido un error con código: " + str(response.status_code)
+
+        
+# llamamos a la función
+print "Número de personas en la ISS: " + str(get_spaceppl())
