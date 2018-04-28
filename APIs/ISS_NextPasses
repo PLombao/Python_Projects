@@ -1,0 +1,79 @@
+"""
+Get the 5 (or n) next passes of the ISS in a location
+given a PostalCode, Address or City
+"""
+
+
+# Importamos la librería json.
+import json
+        
+# Importamos la librería requests para APIs.
+import requests
+
+# importamos la librería datetime para tratar Unix time stamp
+import datetime
+
+# Importamos la librería googlemaps, que interactuará con la API de google maps.
+import googlemaps
+
+# Asignamos la clave de google
+api_key = "AIzaSyDWeo-E3vPCuHHvs3HtpOxeshi99tdu3s0"
+
+# Inicializamos el cliente, indicando la clave de autenticación.
+gmaps = googlemaps.Client(key=api_key)
+
+# Creamos una función que a partir de la dirección nos devuelva una posición
+
+def get_location(postDir):
+    """
+    postDir: string con la dirección o el cod postal
+    devuelve una tupla latitud/longitud
+    """
+    # usamos la API de geodificacion para obtener los datos sobre una direccion a partir del CP
+    geocode_result = gmaps.geocode(postDir)
+    # obtenemos de todos los datos la localización
+    location = geocode_result[0]["geometry"]["location"]
+    # extraemos la latitud y la longitud y las devolvemos
+    return location['lat'],location['lng']
+    
+    
+# construimos la funcion que según una direccion nos de las 5 (o n) próximos pases de la ISS sobre dicho lugar
+
+def get_npass(address, n = 5):
+    """
+    address: direccion del sitio que queremos calcular
+    n: número de pases futuros que queremos calcular
+    devuelve los n próximos pases en cadena de texto
+    """
+    # usamos get_location para sacar las coord  a partir del cp
+    lat, lon = get_location(address)
+    
+    # contruimos el URL con nuestras variables
+    URL = 'http://api.open-notify.org/iss-pass.json?lat=' + str(lat) + '&lon=' + str(lon) + '&n=' + str(n)
+    
+    # hacemos la llamada al API para obtener la información
+    fivenext = requests.get(URL)
+  
+    # pasamos el cuerpo del json a un diccionario  
+    api_dict = json.loads(fivenext.content)
+    
+    # creamos una lista vacía en la que almacenar nuestros tiempos
+    t = []
+    
+    # iteramos sobre los n responses del API
+    for resp in api_dict['response']:
+        # pasamos a string en formato tiempo y  lo añadimos al final de t
+        t.append(datetime.datetime.fromtimestamp(int(resp['risetime'])).strftime('%Y-%m-%d %H:%M:%S'))
+    # devolvemos la lista con los n momentos
+    return t
+
+
+# iteramos sobre los elementos de la lista para mostrar los resultados
+for i in get_npass(15707):
+    print i
+
+# también podemos usarla para una dirección
+print get_npass("Praza+do+Obradoiro,+Santiago+de+Compostela,+A+Coruña", 1)
+
+# o una poblacion
+print get_npass("Barcelona")
