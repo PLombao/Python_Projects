@@ -1,0 +1,54 @@
+import os
+import json
+import requests
+import pandas as pd
+
+# set working directory
+os.chdir("c:\\Users\\raque\\version-control\\geseco\\raw_data\\metadata")
+
+# Tipo petición http://servizos.meteogalicia.es/apiv3/findPlaces?location=oure&API_KEY=***
+
+
+# En primeiro lugar importamos os datos das estacións a buscar coordenadas
+stations = pd.read_csv("Depositos.csv")
+
+# codigo da API
+api_code = 'D2bIx96079Ro4M0Z1u81bfaoZjEuwJg9u1jihDzP2zBvsbaOM6VAW9lk0L9RPXFq'
+
+# creamos listas para gardar os resultados
+lugar = []
+lat = []
+lon = []
+
+for place in stations.loc[:,'Nome']:
+    
+    # creamos os parametros e url para a peticion
+    parameters = {'location': place, 'API_KEY': api_code,'format': 'application/json'}
+    url = 'http://servizos.meteogalicia.es/apiv3/findPlaces'
+    
+    # Enviamos la peticion
+    peticion = requests.get(url, parameters)
+    
+    # gardamos a resposta
+    respuesta = json.loads(peticion.text)
+    
+    # almacenamos a informacion da reposta
+    if respuesta['features'] !=  None:
+        
+        # Obtenemos nuestras coordenadas
+        lugar.append(respuesta['features'][0]['properties']['name']+
+                                 respuesta['features'][0]['properties']['municipality']+
+                                 respuesta['features'][0]['properties']['province'])
+        lon.append(str(respuesta['features'][0]['geometry']['coordinates'][0]))
+        lat.append(str(respuesta['features'][0]['geometry']['coordinates'][1]))
+    else:
+        lugar.append('')
+        lon.append('')
+        lat.append('')
+
+# creamos un dataframe ca informacion e exportamos
+results = pd.DataFrame({'Lugar' : lugar,
+                       'Latitude' : lat,
+                       'Lonxitude' : lon})
+
+results.to_csv("Latitude_Lonxitude.csv", encoding='utf-8')
