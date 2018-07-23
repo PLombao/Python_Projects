@@ -11,6 +11,7 @@ os.chdir("c:\\Users\\raque\\version-control\\geseco\\raw_data\\metadata")
 
 # En primeiro lugar importamos os datos das estacións a buscar coordenadas
 stations = pd.read_csv("Depositos.csv")
+places =  stations.loc[:,'Nome']
 
 # codigo da API
 api_code = 'D2bIx96079Ro4M0Z1u81bfaoZjEuwJg9u1jihDzP2zBvsbaOM6VAW9lk0L9RPXFq'
@@ -20,7 +21,7 @@ lugar = []
 lat = []
 lon = []
 
-for place in stations.loc[:,'Nome']:
+for place in places:
     
     # creamos os parametros e url para a peticion
     parameters = {'location': place, 'API_KEY': api_code,'format': 'application/json'}
@@ -51,4 +52,6 @@ results = pd.DataFrame({'Lugar' : lugar,
                        'Latitude' : lat,
                        'Lonxitude' : lon})
 
+# 
 results.to_csv("Latitude_Lonxitude.csv", encoding='utf-8')
+
