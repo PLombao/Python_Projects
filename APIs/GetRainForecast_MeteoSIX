@@ -1,0 +1,69 @@
+import os
+import json
+import requests
+import pandas as pd
+
+# set working directory
+os.chdir("c:\\Users\\raque\\version-control\\geseco\\raw_data\\metadata")
+
+def getRainForecast(station, startTime, endTime):
+    """
+    Consigue a predicción do total acumulado de precipitacions a partir do 
+    codigo de instalacion, data inicial e final.
+    
+    station: codigo de instalacion
+    startTime: data de inicio da prediccion desexada en formato yyyy-MM-ddTHH:mm:ssZZ
+    endTime: data fin da prediccion desexada en formato yyyy-MM-ddTHH:mm:ssZZ
+    
+    Devolve un dataframe co tempo e o valor da precipitacion en L/m2
+    """
+
+
+    # Codigo da API
+    api_code = 'D2bIx96079Ro4M0Z1u81bfaoZjEuwJg9u1jihDzP2zBvsbaOM6VAW9lk0L9RPXFq'
+    
+    # Importamos os datos das estacións a buscar coordenadas
+    stations = pd.read_csv("Depositos.csv")
+    
+    # Calculamos as coordenadas en funcion do codigo de estacion
+    coordinades = str(float(stations.loc[stations.Codigo == station, 'Lonxitude'])) + "," + str(float(stations.loc[stations.Codigo == station, 'Latitude'])) 
+    
+    # Queremos obter solo as precipitacions
+    variables = "precipitation_amount"
+    
+    # Preparamos os datos da peticion
+    url = 'http://servizos.meteogalicia.es/apiv3/getNumericForecastInfo'
+    parameters = {'coords': coordinades, 
+                  'variables': variables, 
+                  'API_KEY': api_code, 
+                  'startTime': startTime, 
+                  'endTime':endTime}
+    
+    # Enviamos a peticion
+    peticion = requests.get(url, parameters)
+    
+    # Obtemos a resposta
+    resposta = json.loads(peticion.text)
+    data = resposta['features'][0]['properties']['days'][0]['variables'][0]['values']
+    
+    # iniciamos os resultados
+    timeInstant = []
+    value = []
+    
+    # iteramos para gardar os resultados
+    for i in range(len(data)):
+        timeInstant.append(data[i]['timeInstant'])
+        value.append(data[i]['value'])
+       
+    results = pd.DataFrame({'Tempo': timeInstant,
+                            'Valor_Lm2': value})
+
+    return results 
+    
+    
+    
+code = 820
+startTime = '2018-07-23T15:00:00'
+endTime ='2018-07-23T23:00:00'
+
+print(getRainForecast(code, startTime, endTime))
