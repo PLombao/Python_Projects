@@ -1,0 +1,166 @@
+import os
+from openpyxl import load_workbook
+import pandas as pd
+from openpyxl.utils import coordinate_from_string, column_index_from_string, get_column_letter
+import xlrd 
+
+def getNearElement(coord, position):
+    """
+    A partir dunha posición de excel devolve o elemento cercano indicado
+    u up
+    d down
+    r right
+    l left
+    """
+    col, row = coordinate_from_string(coord)
+    col = column_index_from_string(col)
+    if position == 'u':
+        row = row - 1
+    elif position == 'd':
+        row = row + 1
+    elif position == 'r':
+        col = col + 1
+    elif position == 'l':
+        col = col - 1
+    
+    newcoord = str(get_column_letter(col)) + str(row)
+    
+    return newcoord
+
+def getIndex(sheet, targs, startCell = 'A1', endCell = 'Z30', position = None):
+    """
+    A partir dunha folla de excel, unha area de busqueda e os campos a buscar
+    devolve un diccionario cas posicions dos campos
+    
+    Devolve a celda da dereita se así o indicamos
+    """
+    index = {}
+    targets = targs.copy()
+    for cellObj in sheet[startCell:endCell]:
+        for cell in cellObj:
+            for tar in targets:
+                if cell.value == tar:
+                    if position != None:
+                        index[tar] = getNearElement(cell.coordinate, position)
+                    else:
+                        index[tar] = cell.coordinate
+                    
+                    targets.remove(tar)
+    
+    return index
+
+
+# Set path
+mypath = "g:\\Jealsa\\P-JEA-022018 - Machine Learning\\Escurrido"
+os.chdir(mypath)
+
+# Diccionario cas follas de interese do ficheiro excel
+sheets = {0: "ORGANOLÉPTICO ATÚN",
+          1: "EVALUACIÓN",
+          2: "HC.C.17.15 CONTROL DESTRUCTIVO",
+          3: "HC.C.17.15 CONTROL DESTRUCT MAD"
+          }
+
+# Campos a obter para cada sheet
+campos0 = ['Nº Lote:',	'Cdgo PB:',	'Descripción:',	'Nº Unidades lote:',	
+           'F. Fabricación:',	'F. Análisis:', 'F. Liberación:']
+campos1 = ['ASPECTO A LA APERTURA',	'Compacidad',	'Conformación y geometría',	
+           'Superficie',	'Color',	'Líquido de cobertura',	'Olor',	'TEXTURA',	
+           'SABOR',	'SAL',	'LIMPIEZA',	'GLOBAL']
+campos2 = ['n',	'Peso neto',	'X0',	'Xi',	'Control med', 'Error máx']
+campos3 = ['Xt']
+
+# dataframe vacios para rellenar
+df_lote = pd.DataFrame(columns = campos0 + campos1 + ["Filepath"])
+df_control = pd.DataFrame(columns = ["Nº Lote:"] + campos2 + campos3)
+m = 0
+n = 0
+
+# comezamos a iterar
+#mypath = "g:\\Jealsa\\P-JEA-022018 - Machine Learning\\Escurrido\\Escurrido_2017\\HACENDADO"
+anteriores = []
+# Iteramos sobre todos los elementos de la carpeta raiz
+for path, subdirs, files in os.walk(mypath):
+    for name in files:
+        # filtramos, primero por ficheros xlsm
+        if name.endswith('.xlsm'):
+            # filtramos por nombre de fichero para coger solo los que nos interesan
+            if ('-' not in name and 'contra' not in name 
+                and 'peso' not in name and 'limpieza' not in name
+                and 'Copia' not in name and "CONTRA" not in name
+                and 'PESO' not in name and "HC.C" not in name
+                and 'predictivo' not in name and 'CONTROL' not in name
+                and "ESTUDIO" not in name and "estudio" not in name
+                and "MUESTRA" not in path and "COMPETENCIA" not in path
+                and "ESTUDIO" not in path and "mod" not in name
+                and name not in anteriores and name != 'LJ7 066 PB 1078.xlsm'):
+                # registramos ficheros anteriores para no repetir
+                if "ANTERIOR" in name: 
+                    anteriores.append(name.replace(' ANTERIOR', ''))
+
+                # importamos o ficheiro n (data_only activado para non ler formulas, senon valores)
+                wb = load_workbook(os.path.join(path, name), data_only = True)
+
+                # cargamos sheets para df_lote
+                sheet0 = wb.get_sheet_by_name(sheets[0])
+                sheet1 = wb.get_sheet_by_name(sheets[1])
+                sheet2 = wb.get_sheet_by_name(sheets[2])
+                existssheet3 = False
+                if sheets[3] in wb.sheetnames:
+                    sheet3 = wb.get_sheet_by_name(sheets[3])
+                    existssheet3 = True
+                
+                # Calculamos os indices dos campos de interese para cada sheet
+                index0 = getIndex(sheet0, campos0, position = 'r')
+                index1 = getIndex(sheet1, campos1, position = 'r')
+                index2 = getIndex(sheet2, campos2, position = 'd')
+                if existssheet3: index3 = getIndex(sheet3, campos3, position = 'd')
+                
+                # Correximos os indices 1 (alguns teñen un espacio)
+                for key in index1.keys():
+                    if key == key.upper():
+                        index1[key] = getNearElement(index1[key], 'r')
+                
+                # Calculamos a lonxitude da matrix Control
+                count = 0
+                ind = index2['Peso neto']
+                valor = 0
+                while valor != None:
+                    valor = sheet2[ind].value
+                    ind = getNearElement(ind, 'd')
+                    count += 1
+                    
+                # Calculamos a nova fila de datos para o df lote e os engadimos
+                row_lote = []
+                for j in campos0:
+                    if j in index0:
+                        row_lote.append(sheet0[index0[j]].value)
+                    else:
+                        row_lote.append(None)
+                for j in campos1:
+                    row_lote.append(sheet1[index1[j]].value)
+                # engadimos o path
+                row_lote.append(os.path.join(path, name))
+                
+                df_lote.loc[n] = row_lote  
+                n += 1
+                
+                # Calculamos as novas filas para o df control e as vamos engadindo
+                lote = sheet0[index0["Nº Lote:"]].value
+                
+                for row in range(count-1):
+                    row_control = []
+                    row_control.append(lote)
+                    for j in campos2:
+                        row_control.append(sheet2[index2[j]].value)
+                        index2[j] = getNearElement(index2[j], 'd')
+                    for j in campos3:
+                        row_control.append(sheet3[index3[j]].value)
+                        index3[j] = getNearElement(index3[j], 'd')
+                    
+                    df_control.loc[m] = row_control
+                    m += 1
+
+# Pasamos os dataframe a csv's
+df_lote.to_csv("Escurrido_lote.csv")
+df_control.to_csv("Escurrido_control.csv")
